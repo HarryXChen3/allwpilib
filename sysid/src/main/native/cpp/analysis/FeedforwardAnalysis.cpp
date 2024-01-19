@@ -143,6 +143,10 @@ static void CheckOLSDataQuality(const Eigen::MatrixXd& X,
     }
   }
 
+  if (badGains.all()) {
+    
+  }
+
   // If any gains are bad, throw an error
   if (badGains.any()) {
     // Create list of bad gain names
@@ -208,8 +212,17 @@ OLSResult CalculateFeedforwardGains(const Storage& data,
                   y.segment(rowOffset, fastBackward.size()));
 
   // Check quality of collected data
-  if (throwOnBadData) {
-    CheckOLSDataQuality(X, type);
+  // if (throwOnBadData) {
+  //   CheckOLSDataQuality(X, type);
+  // }
+
+  std::vector<int> remainingIndexes(type.independentVariables);
+  // Fill remainingIndexes with all possible indexes
+  std::iota(std::begin(remainingIndexes), std::end(remainingIndexes), 0);
+
+  while (true) {
+      auto ols = OLS(X, y);
+
   }
 
   std::vector<double> gains;
