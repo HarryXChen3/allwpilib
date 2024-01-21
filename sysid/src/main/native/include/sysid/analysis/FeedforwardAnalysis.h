@@ -6,6 +6,7 @@
 
 #include <string>
 #include <tuple>
+#include <bitset>
 #include <vector>
 
 #include "sysid/analysis/AnalysisType.h"
@@ -37,6 +38,84 @@ class InsufficientSamplesError : public std::exception {
   std::string m_message;
 };
 
+struct OLSDataQuality {
+  static constexpr std::array gainNames{"Ks", "Kv", "Ka", "Kg", "offset"};
+    
+  /**
+   * Bitset describing which feedforward gains are impacted by the bad fit coeffs; Bits are Ks, Kv, Ka, Kg, offset
+  */
+  std::bitset<5> badGains = {};
+  /**
+   * Minimum absolute eigenvector component along the regression variable's direction.
+  */
+  double minAbsEigVecComponent = -1;
+  /**
+   * Describes if the OLS data contains a worst fit coefficient.
+  */
+  bool hasWorstCoeff = false;
+  /**
+   * Index describing the worst fit for α, β, γ and optionally δ and ε (elevator and arm)
+  */
+  int worstFitCoeffIndex = -1;
+};
+
+struct FeedforwardGain {
+  /**
+   * The feedforward gain.
+   */
+  double gain = 1;
+
+  /**
+   * Descriptor attached to the feedforward gain.
+   */
+  std::string descriptor = "Feedforward gain.";
+
+  /**
+   * Whether the feedforward gain is valid.
+   */
+  bool isValidGain = true;
+
+  /**
+   * Error message attached to the feedforward gain.
+   */
+  std::string errorMessage = "No error.";
+};
+
+/**
+ * Stores feedforward gains.
+ */
+struct FeedforwardGains {
+  /**
+   * Stores the raw OLSResult from analysis.
+   */
+  OLSResult olsResult;
+
+  /**
+   * The static gain Ks.
+   */
+  FeedforwardGain Ks = {};
+
+  /**
+   * The velocity gain kV.
+   */
+  FeedforwardGain Kv = {};
+
+  /**
+   * The acceleration gain kA.
+   */
+  FeedforwardGain Ka = {};
+
+  /**
+   * The gravity gain Kg.
+   */
+  FeedforwardGain Kg = {};
+
+  /**
+   * The offset (arm).
+   */
+  FeedforwardGain offset = {};
+};
+
 /**
  * Calculates feedforward gains given the data and the type of analysis to
  * perform.
@@ -46,7 +125,7 @@ class InsufficientSamplesError : public std::exception {
  * @param throwOnRankDeficiency Whether to throw if the fit is going to be poor.
  *   This option is provided for unit testing purposes.
  */
-OLSResult CalculateFeedforwardGains(const Storage& data,
+FeedforwardGains CalculateFeedforwardGains(const Storage& data,
                                     const AnalysisType& type,
                                     bool throwOnRankDeficiency = true);
 

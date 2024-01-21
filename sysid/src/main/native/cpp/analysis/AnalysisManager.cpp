@@ -184,7 +184,7 @@ void AnalysisManager::PrepareData() {
   WPI_INFO(m_logger, "{}", "Finished Preparing Data");
 }
 
-AnalysisManager::FeedforwardGains AnalysisManager::CalculateFeedforward() {
+FeedforwardGains AnalysisManager::CalculateFeedforward() {
   if (m_filteredDataset.empty()) {
     throw sysid::InvalidDataError(
         "There is no data to perform gain calculation on.");
@@ -193,78 +193,9 @@ AnalysisManager::FeedforwardGains AnalysisManager::CalculateFeedforward() {
   WPI_INFO(m_logger, "{}", "Calculating Gains");
   // Calculate feedforward gains from the data.
   const auto& analysisType = m_data.mechanismType;
-  const auto& ff =
-      sysid::CalculateFeedforwardGains(GetFilteredData(), analysisType, false);
-
-  const auto& Ks = ff.coeffs[0];
-  FeedforwardGain KsGain = {
-      .gain = Ks, .descriptor = "Voltage needed to overcome static friction."};
-  if (Ks < 0) {
-    KsGain.isValidGain = false;
-    KsGain.errorMessage = fmt::format(
-        "Calculated Ks gain of: {0:.3f} is erroneous! Ks should be >= 0.", Ks);
-  }
-
-  const auto& Kv = ff.coeffs[1];
-  FeedforwardGain KvGain = {
-      .gain = Kv,
-      .descriptor =
-          "Voltage needed to hold/cruise at a constant velocity while "
-          "overcoming the counter-electromotive force and any additional "
-          "friction."};
-  if (Kv < 0) {
-    KvGain.isValidGain = false;
-    KvGain.errorMessage = fmt::format(
-        "Calculated Kv gain of: {0:.3f} is erroneous! Kv should be >= 0.", Kv);
-  }
-
-  const auto& Ka = ff.coeffs[2];
-  FeedforwardGain KaGain = {
-      .gain = Ka,
-      .descriptor =
-          "Voltage needed to induce a given acceleration in the motor shaft."};
-  if (Ka <= 0) {
-    KaGain.isValidGain = false;
-    KaGain.errorMessage = fmt::format(
-        "Calculated Ka gain of: {0:.3f} is erroneous! Ka should be > 0.", Ka);
-  }
-
-  if (analysisType == analysis::kSimple) {
-    return FeedforwardGains{
-        .olsResult = ff, .Ks = KsGain, .Kv = KvGain, .Ka = KaGain};
-  }
-
-  if (analysisType == analysis::kElevator || analysisType == analysis::kArm) {
-    const auto& Kg = ff.coeffs[3];
-    FeedforwardGain KgGain = {
-        Kg, "Voltage needed to counteract the force of gravity."};
-    if (Kg < 0) {
-      KgGain.isValidGain = false;
-      KgGain.errorMessage = fmt::format(
-          "Calculated Kg gain of: {0:.3f} is erroneous! Kg should be >= 0.",
-          Ka);
-    }
-
-    // Elevator analysis only requires Kg
-    if (analysisType == analysis::kElevator) {
-      return FeedforwardGains{.olsResult = ff,
-                              .Ks = KsGain,
-                              .Kv = KvGain,
-                              .Ka = KaGain,
-                              .Kg = KgGain};
-    } else {
-      // Arm analysis requires Kg and an angle offset
-      FeedforwardGain offset = {
-          .gain = ff.coeffs[4],
-          .descriptor =
-              "This is the angle offset which, when added to the angle "
-              "measurement, zeroes it out when the arm is horizontal. This is "
-              "needed for the arm feedforward to work."};
-      return FeedforwardGains{ff, KsGain, KvGain, KaGain, KgGain, offset};
-    }
-  }
-
-  return FeedforwardGains{.olsResult = ff};
+  const auto& ff = sysid::CalculateFeedforwardGains(GetFilteredData(), analysisType, false);
+  
+  return ff;
 }
 
 sysid::FeedbackGains AnalysisManager::CalculateFeedback(

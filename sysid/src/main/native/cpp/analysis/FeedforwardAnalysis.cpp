@@ -76,21 +76,19 @@ static void PopulateOLSData(const std::vector<PreparedData>& d,
 }
 
 /**
- * Throws an InsufficientSamplesError if the collected data is poor for OLS.
+ * Finds the worst fit coefficients for OLS and the impacted gains.
  *
- * @param X The collected data in matrix form for OLS.
+ * @param X The sliced data formed from all collected data in matrix form for OLS.
+ * @param sliceIndexes The currently sliced indexes for X
  * @param type The analysis type.
  */
-static void CheckOLSDataQuality(const Eigen::MatrixXd& X,
-                                const AnalysisType& type) {
+static OLSDataQuality CheckOLSDataQuality(const Eigen::MatrixXd& X, const std::vector<int>& sliceIndexes, const AnalysisType& type) {
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigSolver{X.transpose() * X};
   const Eigen::VectorXd& eigvals = eigSolver.eigenvalues();
   const Eigen::MatrixXd& eigvecs = eigSolver.eigenvectors();
 
-  // Bits are Ks, Kv, Ka, Kg, offset
-  std::bitset<5> badGains;
-
   constexpr double threshold = 10.0;
+  OLSDataQuality dataQuality;
 
   // For n x n matrix XᵀX, need n nonzero eigenvalues for good fit
   for (int row = 0; row < eigvals.rows(); ++row) {
@@ -99,31 +97,41 @@ static void CheckOLSDataQuality(const Eigen::MatrixXd& X,
     int maxIndex;
     double maxCoeff = eigvecs.col(row).cwiseAbs().maxCoeff(&maxIndex);
 
+
+    int remappedMaxIndex = sliceIndexes[maxIndex];
     // Check whether the eigenvector component along the regression variable's
     // direction is below the threshold. If it is, the regression variable's fit
     // is bad.
-    if (std::abs(eigvals(row) * maxCoeff) <= threshold) {
+    double absEigenVecComponent = std::abs(eigvals(row) * maxCoeff);
+    if (absEigenVecComponent <= threshold) {
+      // Below threshold and is worse than previous component
+      if (!dataQuality.hasWorstCoeff || absEigenVecComponent < dataQuality.minAbsEigVecComponent) {
+        dataQuality.minAbsEigVecComponent = absEigenVecComponent;
+        dataQuality.hasWorstCoeff = true;
+        dataQuality.worstFitCoeffIndex = remappedMaxIndex;
+      }
+
+      auto& badGains = dataQuality.badGains;
       // Fit for α is bad
-      if (maxIndex == 0) {
+      if (remappedMaxIndex == 0) {
         // Affects Kv
         badGains.set(1);
       }
 
       // Fit for β is bad
-      if (maxIndex == 1) {
+      if (remappedMaxIndex == 1) {
         // Affects all gains
         badGains.set();
-        break;
       }
 
       // Fit for γ is bad
-      if (maxIndex == 2) {
+      if (remappedMaxIndex == 2) {
         // Affects Ks
         badGains.set(0);
       }
 
       // Fit for δ is bad
-      if (maxIndex == 3) {
+      if (remappedMaxIndex == 3) {
         if (type == analysis::kElevator) {
           // Affects Kg
           badGains.set(3);
@@ -135,7 +143,7 @@ static void CheckOLSDataQuality(const Eigen::MatrixXd& X,
       }
 
       // Fit for ε is bad
-      if (maxIndex == 4) {
+      if (remappedMaxIndex == 4) {
         // Affects Kg and offset
         badGains.set(3);
         badGains.set(4);
@@ -143,44 +151,19 @@ static void CheckOLSDataQuality(const Eigen::MatrixXd& X,
     }
   }
 
-  if (badGains.all()) {
-    
-  }
-
-  // If any gains are bad, throw an error
-  if (badGains.any()) {
-    // Create list of bad gain names
-    constexpr std::array gainNames{"Ks", "Kv", "Ka", "Kg", "offset"};
-    std::vector<std::string_view> badGainsList;
-    for (size_t i = 0; i < badGains.size(); ++i) {
-      if (badGains.test(i)) {
-        badGainsList.emplace_back(gainNames[i]);
-      }
-    }
-
-    std::string error = fmt::format("Insufficient samples to compute {}.\n\n",
-                                    fmt::join(badGainsList, ", "));
-
-    // If all gains are bad, the robot may not have moved
-    if (badGains.all()) {
-      error += "Either no data was collected or the robot didn't move.\n\n";
-    }
-
-    // Append guidance for fixing the data
-    error +=
-        "Ensure the data has:\n\n"
-        "  * at least 2 steady-state velocity events to separate Ks from Kv\n"
-        "  * at least 1 acceleration event to find Ka\n"
-        "  * for elevators, enough vertical motion to measure gravity\n"
-        "  * for arms, enough range of motion to measure gravity and encoder "
-        "offset\n";
-    throw InsufficientSamplesError{error};
-  }
+  return dataQuality;
 }
 
-OLSResult CalculateFeedforwardGains(const Storage& data,
-                                    const AnalysisType& type,
-                                    bool throwOnBadData) {
+static std::optional<ptrdiff_t> GetIndexOf(const std::vector<int>& vec, const int& val) {
+  const ptrdiff_t index = std::distance(vec.begin(), std::find(vec.begin(), vec.end(), val));
+  if (index >= (ptrdiff_t)vec.size()) {
+    return {};
+  }
+
+  return index;
+}
+
+FeedforwardGains CalculateFeedforwardGains(const Storage& data, const AnalysisType& type, bool throwOnBadData) {
   // Iterate through the data and add it to our raw vector.
   const auto& [slowForward, slowBackward, fastForward, fastBackward] = data;
 
@@ -220,17 +203,70 @@ OLSResult CalculateFeedforwardGains(const Storage& data,
   // Fill remainingIndexes with all possible indexes
   std::iota(std::begin(remainingIndexes), std::end(remainingIndexes), 0);
 
-  while (true) {
-      auto ols = OLS(X, y);
+  OLSResult ols;
+  FeedforwardGains ffGains;
 
+  while (!remainingIndexes.empty()) {
+    const auto slicedX = X(Eigen::placeholders::all, remainingIndexes);
+    const auto olsQuality = CheckOLSDataQuality(slicedX, remainingIndexes, type);
+
+    ols = OLS(slicedX, y);
+
+    if (!olsQuality.hasWorstCoeff) {
+      // Didn't find worst coeff, which means we can exit early
+      break;
+    }
+    
+    const auto& badGains = olsQuality.badGains;
+    // Ks, Kg, and offset are ignored since it is possible that they have no contribution, which is indistinguishable from poor sampling.
+    // Kv, Ka are not ignored, which are at bitset indexes 1 and 2.
+
+    // Kv
+    if (badGains.test(1)) {
+      // α = -Kv/Ka
+      // β = 1/Ka
+
+      // Remap index to sliced ols fit by finding index of original in remainingIndexes
+      const auto αPos = GetIndexOf(remainingIndexes, 0);
+      const auto βPos = GetIndexOf(remainingIndexes, 1);
+      if (αPos.has_value() && βPos.has_value()) {
+        double α = ols.coeffs[αPos.value()];
+        double β = ols.coeffs[βPos.value()];
+
+        ffGains.Kv.gain = -α / β;
+      }
+
+      ffGains.Kv.isValidGain = false;
+      ffGains.Kv.errorMessage = fmt::format(
+        "Insufficient samples to compute Kv. Ensure the data has at least 2 steady-state velocity events to separate Ks from Kv."
+      );
+    }
+
+    // Ka
+    if (badGains.test(2)) {
+      // β = 1/Ka
+      const auto βPos = GetIndexOf(remainingIndexes, 1);
+      if (βPos.has_value()) {
+        double β = ols.coeffs[βPos.value()];
+
+        // Ka = 1/β
+        ffGains.Ka.gain = 1 / β;
+      }
+
+      ffGains.Ka.isValidGain = false;
+      ffGains.Ka.errorMessage = fmt::format(
+        "Insufficient samples to compute Ka. Ensure the data has at least 1 acceleration event to find Ka."
+      );
+    }
+
+    // Remove worst fit coefficient index from remaining indexes
+    std::erase(remainingIndexes, olsQuality.worstFitCoeffIndex);
   }
 
-  std::vector<double> gains;
-  gains.reserve(X.rows());
+  // Fill OLSResult into FeedforwardGains
+  ffGains.olsResult = ols;
 
-  auto ols = OLS(X, y);
-
-  // Calculate feedforward gains
+  // Calculate remaining (good) feedforward gains
   //
   // See docs/ols-derivations.md for more details.
   {
@@ -240,26 +276,45 @@ OLSResult CalculateFeedforwardGains(const Storage& data,
     // α = -Kv/Ka
     // β = 1/Ka
     // γ = -Ks/Ka
-    double α = ols.coeffs[0];
-    double β = ols.coeffs[1];
-    double γ = ols.coeffs[2];
+    const auto αPos = GetIndexOf(remainingIndexes, 0);
+    const auto βPos = GetIndexOf(remainingIndexes, 1);
+    const auto γPos = GetIndexOf(remainingIndexes, 2);
 
     // Ks = -γ/β
+    if (βPos.has_value() && γPos.has_value()) {
+      double β = ols.coeffs[βPos.value()];
+      double γ = ols.coeffs[γPos.value()];
+
+      ffGains.Ks.gain = -γ / β;
+    }
+
     // Kv = -α/β
+    if (αPos.has_value() && βPos.has_value()) {
+      double α = ols.coeffs[αPos.value()];
+      double β = ols.coeffs[βPos.value()];
+
+      ffGains.Kv.gain = -α / β;
+    }
+
     // Ka = 1/β
-    gains.emplace_back(-γ / β);
-    gains.emplace_back(-α / β);
-    gains.emplace_back(1 / β);
+    if (βPos.has_value()) {
+      double β = ols.coeffs[βPos.value()];
+      ffGains.Ka.gain = 1 / β;
+    }
 
     if (type == analysis::kElevator) {
       // dx/dt = -Kv/Ka x + 1/Ka u - Ks/Ka sgn(x) - Kg/Ka
       // dx/dt = αx + βu + γ sgn(x) + δ
 
       // δ = -Kg/Ka
-      double δ = ols.coeffs[3];
+      const auto δPos = GetIndexOf(remainingIndexes, 3);
+      if (δPos.has_value() && βPos.has_value()) {
+        double δ = ols.coeffs[δPos.value()];
+        double β = ols.coeffs[βPos.value()];
 
-      // Kg = -δ/β
-      gains.emplace_back(-δ / β);
+        // Kg = -δ/β
+        ffGains.Kg.gain = -δ / β;
+      }
     }
 
     if (type == analysis::kArm) {
@@ -270,18 +325,74 @@ OLSResult CalculateFeedforwardGains(const Storage& data,
 
       // δ = -Kg/Ka cos(offset)
       // ε = Kg/Ka sin(offset)
-      double δ = ols.coeffs[3];
-      double ε = ols.coeffs[4];
+      const auto δPos = GetIndexOf(remainingIndexes, 3);
+      const auto εPos = GetIndexOf(remainingIndexes, 4);
 
-      // Kg = hypot(δ, ε)/β      NOLINT
-      // offset = atan2(ε, -δ)   NOLINT
-      gains.emplace_back(std::hypot(δ, ε) / β);
-      gains.emplace_back(std::atan2(ε, -δ));
+      if (δPos.has_value() && εPos.has_value() && βPos.has_value()) {
+        double δ = ols.coeffs[δPos.value()];
+        double ε = ols.coeffs[εPos.value()];
+        double β = ols.coeffs[βPos.value()];
+
+        // Kg = hypot(δ, ε)/β      NOLINT
+        // offset = atan2(ε, -δ)   NOLINT
+        ffGains.Kg.gain = std::hypot(δ, ε) / β;
+        ffGains.offset.gain = std::atan2(ε, -δ);
+      }
     }
   }
 
-  // Gains are Ks, Kv, Ka, Kg (elevator/arm only), offset (arm only)
-  return OLSResult{gains, ols.rSquared, ols.rmse};
+  // Ks, Kv, and Kg senisible gains checking, and fills descriptors
+  {
+    auto& Ks = ffGains.Ks;
+    Ks.descriptor = "Voltage needed to overcome static friction.";
+    if (Ks.isValidGain && Ks.gain < 0) {
+      Ks.isValidGain = false;
+      Ks.errorMessage = fmt::format("Calculated Ks gain of: {0:.3f} is erroneous! Ks should be >= 0.", Ks.gain);
+    }
+
+    auto& Kv = ffGains.Kv;
+    Kv.descriptor =
+          "Voltage needed to hold/cruise at a constant velocity while "
+          "overcoming the counter-electromotive force and any additional "
+          "friction.";
+    if (Kv.isValidGain && Kv.gain < 0) {
+      Kv.isValidGain = false;
+      Kv.errorMessage = fmt::format(
+          "Calculated Kv gain of: {0:.3f} is erroneous! Kv should be >= 0.", Kv.gain);
+    }
+
+    auto& Ka = ffGains.Ka;
+    Ka.descriptor = "Voltage needed to induce a given acceleration in the motor shaft.";
+    if (Ka.isValidGain && Ka.gain <= 0) {
+      Ka.isValidGain = false;
+      Ka.errorMessage = fmt::format(
+          "Calculated Ka gain of: {0:.3f} is erroneous! Ka should be > 0.", Ka.gain);
+    }
+  }
+
+  if (type == analysis::kElevator || type == analysis::kArm) {
+    auto& Kg = ffGains.Kg;
+    Kg.descriptor = "Voltage needed to counteract the force of gravity.";
+    if (Kg.isValidGain && Kg.gain < 0) {
+      Kg.isValidGain = false;
+      Kg.errorMessage = fmt::format("Calculated Kg gain of: {0:.3f} is erroneous! Kg should be >= 0.", Kg.gain);
+    }
+
+    // Elevator analysis only requires Kg
+    if (type == analysis::kElevator) {
+      return ffGains;
+    } else {
+      // Arm analysis requires Kg and an angle offset
+      auto& offset = ffGains.offset;
+      offset.descriptor =
+              "This is the angle offset which, when added to the angle "
+              "measurement, zeroes it out when the arm is horizontal. This is "
+              "needed for the arm feedforward to work.";
+      return ffGains;
+    }
+  }
+
+  return ffGains;
 }
 
 }  // namespace sysid

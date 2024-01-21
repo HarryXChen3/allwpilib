@@ -127,7 +127,7 @@ bool Analyzer::IsDataErrorState() {
 void Analyzer::ResetData() {
   m_plot.ResetData();
   m_manager = std::make_unique<AnalysisManager>(m_settings, m_logger);
-  m_feedforwardGains = AnalysisManager::FeedforwardGains{};
+  m_feedforwardGains = FeedforwardGains {};
   UpdateFeedbackGains();
 }
 
@@ -487,7 +487,7 @@ void Analyzer::CollectFeedforwardGains(float beginX, float beginY) {
 }
 
 void Analyzer::DisplayFeedforwardGain(const char* text,
-                                      AnalysisManager::FeedforwardGain& ffGain,
+                                      FeedforwardGain& ffGain,
                                       bool readOnly = true) {
   DisplayDouble(text, &ffGain.gain, readOnly);
   if (!ffGain.isValidGain) {

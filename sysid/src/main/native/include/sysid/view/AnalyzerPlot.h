@@ -17,7 +17,7 @@
 #include <wpi/Logger.h>
 #include <wpi/spinlock.h>
 
-#include "sysid/analysis/AnalysisManager.h"
+#include "sysid/analysis/FeedforwardAnalysis.h"
 #include "sysid/analysis/AnalysisType.h"
 #include "sysid/analysis/Storage.h"
 
@@ -54,7 +54,7 @@ class AnalyzerPlot {
    */
   void SetData(const Storage& rawData, const Storage& filteredData,
                std::string_view unit,
-               const AnalysisManager::FeedforwardGains& ff,
+               const FeedforwardGains& ff,
                const std::array<units::second_t, 4>& startTimes,
                AnalysisType type, std::atomic<bool>& abort);
 

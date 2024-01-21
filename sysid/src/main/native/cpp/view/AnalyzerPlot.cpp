@@ -127,7 +127,7 @@ void AnalyzerPlot::SetRawData(const Storage& data, std::string_view unit,
 
 void AnalyzerPlot::SetData(const Storage& rawData, const Storage& filteredData,
                            std::string_view unit,
-                           const AnalysisManager::FeedforwardGains& ffGains,
+                           const FeedforwardGains& ffGains,
                            const std::array<units::second_t, 4>& startTimes,
                            AnalysisType type, std::atomic<bool>& abort) {
   double simSquaredErrorSum = 0;

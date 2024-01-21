@@ -191,7 +191,7 @@ class Analyzer : public glass::View {
    * validity and message.
    */
   void DisplayFeedforwardGain(const char* text,
-                              AnalysisManager::FeedforwardGain& ffGain,
+                              FeedforwardGain& ffGain,
                               bool readOnly);
 
   /**
@@ -218,7 +218,7 @@ class Analyzer : public glass::View {
   int m_selectedPreset = 0;
 
   // Feedforward and feedback gains.
-  AnalysisManager::FeedforwardGains m_feedforwardGains;
+  FeedforwardGains m_feedforwardGains;
   double m_accelRSquared;
   double m_accelRMSE;
   double m_Kp;
