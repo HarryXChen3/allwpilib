@@ -193,8 +193,9 @@ FeedforwardGains AnalysisManager::CalculateFeedforward() {
   WPI_INFO(m_logger, "{}", "Calculating Gains");
   // Calculate feedforward gains from the data.
   const auto& analysisType = m_data.mechanismType;
-  const auto& ff = sysid::CalculateFeedforwardGains(GetFilteredData(), analysisType, false);
-  
+  const auto& ff =
+      sysid::CalculateFeedforwardGains(GetFilteredData(), analysisType);
+
   return ff;
 }
 
