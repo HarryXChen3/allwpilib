@@ -190,8 +190,7 @@ class Analyzer : public glass::View {
    * Displays a Feedforward gain, including the gain itself along with its
    * validity and message.
    */
-  void DisplayFeedforwardGain(const char* text,
-                              FeedforwardGain& ffGain,
+  void DisplayFeedforwardGain(const char* text, FeedforwardGain& ffGain,
                               bool readOnly);
 
   /**

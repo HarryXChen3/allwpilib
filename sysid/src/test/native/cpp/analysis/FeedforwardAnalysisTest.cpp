@@ -160,6 +160,7 @@ testing::AssertionResult FitIsBad(std::span<const double> expectedGains,
   return result;
 }
 
+#if 0
 /**
  * Asserts that two arrays are equal.
  *
@@ -180,7 +181,9 @@ void ExpectArrayNear(std::span<const double> expected,
     EXPECT_NEAR(expected[i], actual[i], tolerances[i]) << "where i = " << i;
   }
 }
+#endif
 
+#if 0
 static std::vector<double> BuildFeedforwardGainsArray(const sysid::FeedforwardGains& ff, const sysid::AnalysisType& type) {
   if (type == sysid::analysis::kSimple) {
     return {ff.Ks.gain, ff.Kv.gain, ff.Ka.gain};
@@ -192,9 +195,11 @@ static std::vector<double> BuildFeedforwardGainsArray(const sysid::FeedforwardGa
     throw std::runtime_error("NotImplemented!");
   }
 }
+#endif
 
-static constexpr double PercentError(const double& actual, const double& expected) {
-  return ((actual - expected)/expected) * 100;
+static constexpr double PercentError(const double& actual,
+                                     const double& expected) {
+  return ((actual - expected) / expected) * 100;
 }
 
 /**
@@ -215,24 +220,22 @@ void RunTests(Model& model, const sysid::AnalysisType& type,
           sysid::CalculateFeedforwardGains(CollectData(model, movements), type);
 
       fmt::print("Movements: {}\n", movements);
-      fmt::print("Ks: {}, Kv: {}, Ka: {}\n", ff.Ks.gain, ff.Kv.gain, ff.Ka.gain);
-      fmt::print("KsGood: {}, KvGood: {}, KaGood: {}\n", ff.Ks.isValidGain, ff.Kv.isValidGain, ff.Ka.isValidGain);
+      fmt::print("Ks: {}, Kv: {}, Ka: {}\n", ff.Ks.gain, ff.Kv.gain,
+                 ff.Ka.gain);
+      fmt::print("KsGood: {}, KvGood: {}, KaGood: {}\n", ff.Ks.isValidGain,
+                 ff.Kv.isValidGain, ff.Ka.isValidGain);
       fmt::print("KsE: {0}:{1:.3f}%, KvE: {2}:{3:.3f}%, KaE: {4}:{5:.3f}%\n\n",
-        expectedGains[0],
-        PercentError(ff.Ks.gain, expectedGains[0]),
-        expectedGains[1],
-        PercentError(ff.Kv.gain, expectedGains[1]),
-        expectedGains[2],
-        PercentError(ff.Ka.gain, expectedGains[2])
-      );
+                 expectedGains[0], PercentError(ff.Ks.gain, expectedGains[0]),
+                 expectedGains[1], PercentError(ff.Kv.gain, expectedGains[1]),
+                 expectedGains[2], PercentError(ff.Ka.gain, expectedGains[2]));
 
       // std::vector<double> gains = {ff.Ks.gain, ff.Kv.gain, ff.Ka.gain};
       // ExpectArrayNear(expectedGains, gains, tolerances);
     } catch (sysid::InsufficientSamplesError&) {
       // If calculation threw an exception, confirm at least one of the gains
       // doesn't match
-      auto ff = sysid::CalculateFeedforwardGains(CollectData(model, movements),
-                                                 type, false);
+      auto ff =
+          sysid::CalculateFeedforwardGains(CollectData(model, movements), type);
       EXPECT_TRUE(FitIsBad(expectedGains, ff.olsResult.coeffs, tolerances));
     }
   }

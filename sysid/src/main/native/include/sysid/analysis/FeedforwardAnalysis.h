@@ -4,9 +4,9 @@
 
 #pragma once
 
+#include <bitset>
 #include <string>
 #include <tuple>
-#include <bitset>
 #include <vector>
 
 #include "sysid/analysis/AnalysisType.h"
@@ -40,22 +40,25 @@ class InsufficientSamplesError : public std::exception {
 
 struct OLSDataQuality {
   static constexpr std::array gainNames{"Ks", "Kv", "Ka", "Kg", "offset"};
-    
+
   /**
-   * Bitset describing which feedforward gains are impacted by the bad fit coeffs; Bits are Ks, Kv, Ka, Kg, offset
-  */
+   * Bitset describing which feedforward gains are impacted by the bad fit
+   * coeffs; Bits are Ks, Kv, Ka, Kg, offset
+   */
   std::bitset<5> badGains = {};
   /**
-   * Minimum absolute eigenvector component along the regression variable's direction.
-  */
+   * Minimum absolute eigenvector component along the regression variable's
+   * direction.
+   */
   double minAbsEigVecComponent = -1;
   /**
    * Describes if the OLS data contains a worst fit coefficient.
-  */
+   */
   bool hasWorstCoeff = false;
   /**
-   * Index describing the worst fit for α, β, γ and optionally δ and ε (elevator and arm)
-  */
+   * Index describing the worst fit for α, β, γ and optionally δ and ε (elevator
+   * and arm)
+   */
   int worstFitCoeffIndex = -1;
 };
 
@@ -122,11 +125,8 @@ struct FeedforwardGains {
  *
  * @param data The OLS input data.
  * @param type The analysis type.
- * @param throwOnRankDeficiency Whether to throw if the fit is going to be poor.
- *   This option is provided for unit testing purposes.
  */
 FeedforwardGains CalculateFeedforwardGains(const Storage& data,
-                                    const AnalysisType& type,
-                                    bool throwOnRankDeficiency = true);
+                                           const AnalysisType& type);
 
 }  // namespace sysid
