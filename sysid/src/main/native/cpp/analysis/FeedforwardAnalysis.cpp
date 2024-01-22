@@ -178,8 +178,11 @@ FeedforwardGains CalculateFeedforwardGains(const Storage& data,
       FeedforwardGain badGain{
           .isValidGain = false,
           .errorMessage =
-              "Insufficient samples to compute any gains. Ensure the data has "
-              "at least 1 acceleration event."};
+              "Insufficient samples to compute any gains. Ensure the data has:\n\n"
+              "  * at least 2 steady-state velocity events to separate Ks from Kv\n"
+              "  * at least 1 acceleration event to find Ka\n"
+              "  * for elevators, enough vertical motion to measure gravity\n"
+              "  * for arms, enough range of motion to measure gravity and encoder offset\n"};
       ffGains.Ks = badGain;
       ffGains.Kv = badGain;
       ffGains.Ka = badGain;

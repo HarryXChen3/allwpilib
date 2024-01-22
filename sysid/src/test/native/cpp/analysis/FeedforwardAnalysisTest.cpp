@@ -111,55 +111,6 @@ sysid::Storage CollectData(Model& model, std::bitset<4> movements) {
   return storage;
 }
 
-/**
- * Asserts success if the gains contain NaNs or are too far from their expected
- * values.
- *
- * @param expectedGains The expected feedforward gains.
- * @param actualGains The calculated feedforward gains.
- * @param tolerances The tolerances for the coefficient comparisons.
- */
-testing::AssertionResult FitIsBad(std::span<const double> expectedGains,
-                                  std::span<const double> actualGains,
-                                  std::span<const double> tolerances) {
-  // Check for NaN
-  for (const auto& coeff : actualGains) {
-    if (std::isnan(coeff)) {
-      return testing::AssertionSuccess();
-    }
-  }
-
-  for (size_t i = 0; i < expectedGains.size(); ++i) {
-    if (std::abs(expectedGains[i] - actualGains[i]) >= tolerances[i]) {
-      return testing::AssertionSuccess();
-    }
-  }
-
-  auto result = testing::AssertionFailure();
-
-  result << "\n";
-  for (size_t i = 0; i < expectedGains.size(); ++i) {
-    if (i == 0) {
-      result << "Ks";
-    } else if (i == 1) {
-      result << "Kv";
-    } else if (i == 2) {
-      result << "Ka";
-    } else if (i == 3) {
-      result << "Kg";
-    } else if (i == 4) {
-      result << "offset";
-    }
-
-    result << ":\n";
-    result << "  expected " << expectedGains[i] << ",\n";
-    result << "  actual " << actualGains[i] << ",\n";
-    result << "  diff " << std::abs(expectedGains[i] - actualGains[i]) << "\n";
-  }
-
-  return result;
-}
-
 #if 0
 /**
  * Asserts that two arrays are equal.
@@ -197,9 +148,80 @@ static std::vector<double> BuildFeedforwardGainsArray(const sysid::FeedforwardGa
 }
 #endif
 
-static constexpr double PercentError(const double& actual,
-                                     const double& expected) {
-  return ((actual - expected) / expected) * 100;
+/**
+ * Computes the decimal percent error between 2 doubles.
+ * @param actual The actual value.
+ * @param expected The expected value.
+ * @return The percent error in decimal form (0.5 is 50%)
+*/
+static constexpr double PercentErrorDecimal(const double actual, const double expected) {
+  return (actual - expected) / expected;
+}
+
+/**
+ * Computes if a FeedforwardGain is impossible based its value compared to it's possible range of values, e.g. Ks < 0 is erroneous.
+ * 
+ * @param ffGain The FeedforwardGain to test against.
+ * @param gainIndex The corresponding index of the gain in typical order, {Ks, Kv, Ka, [Kg], [offset]} where [] denotes optional (conditional)
+*/
+static bool IsOutOfRangeFeedforwardGain(const sysid::FeedforwardGain& ffGain, const size_t gainIndex) {
+  return gainIndex == 0 && ffGain.gain < 0  // Ks
+    || gainIndex == 1 && ffGain.gain < 0    // Kv
+    || gainIndex == 2 && ffGain.gain <= 0   // Ka
+    || gainIndex == 3 && ffGain.gain < 0;   // Kg
+}
+
+/**
+ * Asserts success if every FeedforwardGain in FeedforwardGains if marked as valid, must fall within a percent error tolerance to the expected gain,
+ * and if invalid, must fall outside the tolerance. Gains that contain NaNs are expected to be marked as invalid.
+ * 
+ * @param actualGains The calculated feedforward gains.
+ * @param expectedGains The expected feedforward gains.
+ * @param tolerances The percent tolerances (decimal) for the coefficient comparisons.
+ * @param absTolerancesOnZero The absolute tolerances to use if the expected gain is zero (percent-value does not work when expected=0).
+ */
+static testing::AssertionResult AssertFeedforwardGains(const sysid::FeedforwardGains& actualGains,
+                                                      const sysid::AnalysisType& analysisType,
+                                                      std::span<const double> expectedGains,
+                                                      std::span<const double> percentTolerances,
+                                                      std::span<const double> absTolerancesOnZero) {
+  // Size of expectedGains should be equal to the number of independent variables in the analysis
+  assert(analysisType.independentVariables == expectedGains.size());
+  constexpr std::array gainNames{"Ks", "Kv", "Ka", "Kg", "offset"};
+  const std::array gains{actualGains.Ks, actualGains.Kv, actualGains.Ka, actualGains.Kg, actualGains.offset};
+
+  auto result = testing::AssertionSuccess();
+  for (size_t i = 0; i < analysisType.independentVariables; ++i) {
+    const sysid::FeedforwardGain& ffGain = gains[i];
+    const double expectedGain = expectedGains[i];
+    // If expectedGain == 0, then we can't do percent-value on it, so fall-back to absolute error and tolerances
+    const bool useAbsDiff = expectedGain == 0;
+    const double tolerance = useAbsDiff ? absTolerancesOnZero[i] : percentTolerances[i];
+    const double absError = useAbsDiff ? std::abs(ffGain.gain - expectedGain) : std::abs(PercentErrorDecimal(ffGain.gain, expectedGain));
+
+    // Valid gain, error is at or below tolerance
+    if (ffGain.isValidGain && absError <= tolerance) {
+      continue;
+    }
+    
+    // Invalid gain, error is greater than tolerance or gain is NaN
+    if (!ffGain.isValidGain && (absError > tolerance || std::isnan(ffGain.gain) || IsOutOfRangeFeedforwardGain(ffGain, i))) {
+      continue;
+    }
+
+    // If the result is still a success, make it a failure
+    if (result) {
+      result = !result;
+    }
+
+    result << "\n" << gainNames[i] << ":\n";
+    result << "  expected " << expectedGain << ",\n";
+    result << "  actual " << ffGain.gain << ",\n";
+    result << "  expected-error " << fmt::format("{0} {1:f}{2},\n", ffGain.isValidGain ? "<=" : ">", useAbsDiff ? tolerance : tolerance * 100, useAbsDiff ? "" : "%");
+    result << "  actual-error " << fmt::format("{0:f}{1}\n", useAbsDiff ? absError : absError * 100, useAbsDiff ? "" : "%");
+  }
+
+  return result;
 }
 
 /**
@@ -207,97 +229,88 @@ static constexpr double PercentError(const double& actual,
  * @param model The simulation model.
  * @param type The analysis type.
  * @param expectedGains The expected feedforward gains.
- * @param tolerances The tolerances for the coefficient comparisons.
+ * @param percentTolerances The percentage tolerances for the coefficient comparisons.
+ * @param absTolerancesOnZero The absolute tolerances to use if the expected gain is zero (percent-value does not work when expected=0).
  */
 template <typename Model>
 void RunTests(Model& model, const sysid::AnalysisType& type,
               std::span<const double> expectedGains,
-              std::span<const double> tolerances) {
+              std::span<const double> percentTolerances,
+              std::span<const double> absTolerancesOnZero) {
   // Iterate through all combinations of movements
   for (int movements = 0; movements < kMovementCombinations; ++movements) {
-    try {
-      auto ff =
-          sysid::CalculateFeedforwardGains(CollectData(model, movements), type);
+    auto ff =
+        sysid::CalculateFeedforwardGains(CollectData(model, movements), type);
 
-      fmt::print("Movements: {}\n", movements);
-      fmt::print("Ks: {}, Kv: {}, Ka: {}\n", ff.Ks.gain, ff.Kv.gain,
-                 ff.Ka.gain);
-      fmt::print("KsGood: {}, KvGood: {}, KaGood: {}\n", ff.Ks.isValidGain,
-                 ff.Kv.isValidGain, ff.Ka.isValidGain);
-      fmt::print("KsE: {0}:{1:.3f}%, KvE: {2}:{3:.3f}%, KaE: {4}:{5:.3f}%\n\n",
-                 expectedGains[0], PercentError(ff.Ks.gain, expectedGains[0]),
-                 expectedGains[1], PercentError(ff.Kv.gain, expectedGains[1]),
-                 expectedGains[2], PercentError(ff.Ka.gain, expectedGains[2]));
+    // fmt::print("Movements: {}\n", movements);
+    // fmt::print("Ks: {}, Kv: {}, Ka: {}\n", ff.Ks.gain, ff.Kv.gain,
+    //             ff.Ka.gain);
+    // fmt::print("KsGood: {}, KvGood: {}, KaGood: {}\n", ff.Ks.isValidGain,
+    //             ff.Kv.isValidGain, ff.Ka.isValidGain);
+    // fmt::print("KsE: {0}:{1:.3f}%, KvE: {2}:{3:.3f}%, KaE: {4}:{5:.3f}%\n\n",
+    //             expectedGains[0], PercentErrorDecimal(ff.Ks.gain, expectedGains[0]) * 100,
+    //             expectedGains[1], PercentErrorDecimal(ff.Kv.gain, expectedGains[1]) * 100,
+    //             expectedGains[2], PercentErrorDecimal(ff.Ka.gain, expectedGains[2]) * 100);
 
-      // std::vector<double> gains = {ff.Ks.gain, ff.Kv.gain, ff.Ka.gain};
-      // ExpectArrayNear(expectedGains, gains, tolerances);
-    } catch (sysid::InsufficientSamplesError&) {
-      // If calculation threw an exception, confirm at least one of the gains
-      // doesn't match
-      auto ff =
-          sysid::CalculateFeedforwardGains(CollectData(model, movements), type);
-      EXPECT_TRUE(FitIsBad(expectedGains, ff.olsResult.coeffs, tolerances));
-    }
+    EXPECT_TRUE(AssertFeedforwardGains(ff, type, expectedGains, percentTolerances, absTolerancesOnZero));
   }
 }
 
 }  // namespace
 
-// TEST(FeedforwardAnalysisTest, Arm) {
-//   {
-//     constexpr double Ks = 1.01;
-//     constexpr double Kv = 3.060;
-//     constexpr double Ka = 0.327;
-//     constexpr double Kg = 0.211;
+TEST(FeedforwardAnalysisTest, Arm) {
+  {
+    constexpr double Ks = 1.01;
+    constexpr double Kv = 3.060;
+    constexpr double Ka = 0.327;
+    constexpr double Kg = 0.211;
 
-//     for (const auto& offset : {-2.0, -1.0, 0.0, 1.0, 2.0}) {
-//       sysid::ArmSim model{Ks, Kv, Ka, Kg, offset};
+    for (const auto& offset : {-2.0, -1.0, 0.0, 1.0, 2.0}) {
+      sysid::ArmSim model{Ks, Kv, Ka, Kg, offset};
 
-//       RunTests(model, sysid::analysis::kArm, {{Ks, Kv, Ka, Kg, offset}},
-//                {{8e-3, 8e-3, 8e-3, 8e-3, 3e-2}});
-//     }
-//   }
+      RunTests(model, sysid::analysis::kArm, {{Ks, Kv, Ka, Kg, offset}}, {{8e-2, 8e-2, 8e-2, 8e-2, 8e-2}}, {{1e-4, 1e-4, 1e-4, 1e-4, 2e-2}});
+    }
+  }
 
-//   {
-//     constexpr double Ks = 0.547;
-//     constexpr double Kv = 0.0693;
-//     constexpr double Ka = 0.1170;
-//     constexpr double Kg = 0.122;
+  {
+    constexpr double Ks = 0.547;
+    constexpr double Kv = 0.0693;
+    constexpr double Ka = 0.1170;
+    constexpr double Kg = 0.122;
 
-//     for (const auto& offset : {-2.0, -1.0, 0.0, 1.0, 2.0}) {
-//       sysid::ArmSim model{Ks, Kv, Ka, Kg, offset};
+    for (const auto& offset : {-2.0, -1.0, 0.0, 1.0, 2.0}) {
+      sysid::ArmSim model{Ks, Kv, Ka, Kg, offset};
 
-//       RunTests(model, sysid::analysis::kArm, {{Ks, Kv, Ka, Kg, offset}},
-//                {{8e-3, 8e-3, 8e-3, 8e-3, 5e-2}});
-//     }
-//   }
-// }
+      RunTests(model, sysid::analysis::kArm, {{Ks, Kv, Ka, Kg, offset}}, {{8e-2, 8e-2, 8e-2, 8e-2, 8e-2}}, {{1e-4, 1e-4, 1e-4, 1e-4, 2e-2}});
+    }
+  }
+}
 
-// TEST(FeedforwardAnalysisTest, Elevator) {
-//   {
-//     constexpr double Ks = 1.01;
-//     constexpr double Kv = 3.060;
-//     constexpr double Ka = 0.327;
-//     constexpr double Kg = -0.211;
+TEST(FeedforwardAnalysisTest, Elevator) {
+  {
+    constexpr double Ks = 1.01;
+    constexpr double Kv = 3.060;
+    constexpr double Ka = 0.327;
+    constexpr double Kg = -0.211;
 
-//     sysid::ElevatorSim model{Ks, Kv, Ka, Kg};
+    sysid::ElevatorSim model{Ks, Kv, Ka, Kg};
 
-//     RunTests(model, sysid::analysis::kElevator, {{Ks, Kv, Ka, Kg}},
-//              {{8e-3, 8e-3, 8e-3, 8e-3}});
-//   }
+    RunTests(model, sysid::analysis::kElevator, {{Ks, Kv, Ka, Kg}},
+             {{8e-2, 8e-2, 8e-2, 8e-2}}, {{1e-4, 1e-4, 1e-4, 1e-4}});
+  }
 
-//   {
-//     constexpr double Ks = 0.547;
-//     constexpr double Kv = 0.0693;
-//     constexpr double Ka = 0.1170;
-//     constexpr double Kg = -0.122;
+  {
+    constexpr double Ks = 0.547;
+    constexpr double Kv = 0.0693;
+    constexpr double Ka = 0.1170;
+    constexpr double Kg = -0.122;
 
-//     sysid::ElevatorSim model{Ks, Kv, Ka, Kg};
+    sysid::ElevatorSim model{Ks, Kv, Ka, Kg};
 
-//     RunTests(model, sysid::analysis::kElevator, {{Ks, Kv, Ka, Kg}},
-//              {{8e-3, 8e-3, 8e-3, 8e-3}});
-//   }
-// }
+    RunTests(model, sysid::analysis::kElevator, {{Ks, Kv, Ka, Kg}},
+             {{8e-2, 8e-2, 8e-2, 8e-2}}, {{1e-4, 1e-4, 1e-4, 1e-4}});
+  }
+}
 
 TEST(FeedforwardAnalysisTest, Simple) {
   {
@@ -308,17 +321,17 @@ TEST(FeedforwardAnalysisTest, Simple) {
     sysid::SimpleMotorSim model{Ks, Kv, Ka};
 
     RunTests(model, sysid::analysis::kSimple, {{Ks, Kv, Ka}},
-             {{8e-3, 8e-3, 8e-3}});
+             {{8e-2, 8e-2, 8e-2}}, {{1e-4, 1e-4, 1e-4}});
   }
 
-  // {
-  //   constexpr double Ks = 0.547;
-  //   constexpr double Kv = 0.0693;
-  //   constexpr double Ka = 0.1170;
+  {
+    constexpr double Ks = 0.547;
+    constexpr double Kv = 0.0693;
+    constexpr double Ka = 0.1170;
 
-  //   sysid::SimpleMotorSim model{Ks, Kv, Ka};
+    sysid::SimpleMotorSim model{Ks, Kv, Ka};
 
-  //   RunTests(model, sysid::analysis::kSimple, {{Ks, Kv, Ka}},
-  //            {{8e-3, 8e-3, 8e-3}});
-  // }
+    RunTests(model, sysid::analysis::kSimple, {{Ks, Kv, Ka}},
+             {{8e-2, 8e-2, 8e-2}}, {{1e-4, 1e-4, 1e-4}});
+  }
 }
