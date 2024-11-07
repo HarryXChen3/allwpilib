@@ -60,16 +60,6 @@
 // Compiler identification, EIGEN_COMP_*
 //------------------------------------------------------------------------------------------
 
-/// \internal Disable NEON features in Intellisense
-#if __INTELLISENSE__
-#ifdef __ARM_NEON
-#undef __ARM_NEON
-#endif
-#ifdef __ARM_NEON__
-#undef __ARM_NEON__
-#endif
-#endif
-
 /// \internal EIGEN_COMP_GNUC set to version (e.g., 951 for GCC 9.5.1) for all compilers compatible with GCC
 #ifdef __GNUC__
 #define EIGEN_COMP_GNUC (__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__)
@@ -222,7 +212,7 @@
 
 /// \internal EIGEN_COMP_FCC set to FCC version if the compiler is Fujitsu Compiler (traditional mode)
 /// \note The Fujitsu C/C++ compiler uses the traditional mode based
-/// on EDG g++ 6.1 by default or if envoked with the -Nnoclang flag
+/// on EDG g++ 6.1 by default or if invoked with the -Nnoclang flag
 #if defined(__FUJITSU)
 #define EIGEN_COMP_FCC (__FCC_major__ * 100 + __FCC_minor__ * 10 + __FCC_patchlevel__)
 #else
@@ -231,7 +221,7 @@
 
 /// \internal EIGEN_COMP_CLANGFCC set to FCC version if the compiler is Fujitsu Compiler (Clang mode)
 /// \note The Fujitsu C/C++ compiler uses the non-traditional mode
-/// based on Clang 7.1.0 if envoked with the -Nclang flag
+/// based on Clang 7.1.0 if invoked with the -Nclang flag
 #if defined(__CLANG_FUJITSU)
 #define EIGEN_COMP_CLANGFCC (__FCC_major__ * 100 + __FCC_minor__ * 10 + __FCC_patchlevel__)
 #else

@@ -87,10 +87,6 @@
     <Source name="CombinedRuntimeLoader.java" />
   </Match>
   <Match>
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
-    <Source name="RuntimeLoader.java" />
-  </Match>
-  <Match>
     <Bug pattern="SF_SWITCH_FALLTHROUGH" />
     <Source name="CameraServer.java" />
   </Match>
@@ -163,5 +159,9 @@
   -->
   <Match>
     <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS" />
+  </Match>
+  <Match>
+    <Bug pattern="UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD" />
+    <Class name="edu.wpi.first.epilogue.EpilogueConfiguration" />
   </Match>
 </FindBugsFilter>

@@ -4,8 +4,10 @@
 
 #include "RawSinkImpl.h"
 
+#include <algorithm>
+#include <memory>
+
 #include "Instance.h"
-#include "cscore.h"
 #include "cscore_raw.h"
 
 using namespace cs;
@@ -184,16 +186,17 @@ uint64_t GrabSinkFrameTimeout(CS_Sink sink, WPI_RawFrame& image, double timeout,
 }  // namespace cs
 
 extern "C" {
-CS_Sink CS_CreateRawSink(const char* name, CS_Bool isCv, CS_Status* status) {
-  return cs::CreateRawSink(name, isCv, status);
+CS_Sink CS_CreateRawSink(const struct WPI_String* name, CS_Bool isCv,
+                         CS_Status* status) {
+  return cs::CreateRawSink(wpi::to_string_view(name), isCv, status);
 }
 
-CS_Sink CS_CreateRawSinkCallback(const char* name, CS_Bool isCv, void* data,
-                                 void (*processFrame)(void* data,
-                                                      uint64_t time),
-                                 CS_Status* status) {
+CS_Sink CS_CreateRawSinkCallback(
+    const struct WPI_String* name, CS_Bool isCv, void* data,
+    void (*processFrame)(void* data, uint64_t time), CS_Status* status) {
   return cs::CreateRawSinkCallback(
-      name, isCv, [=](uint64_t time) { processFrame(data, time); }, status);
+      wpi::to_string_view(name), isCv,
+      [=](uint64_t time) { processFrame(data, time); }, status);
 }
 
 uint64_t CS_GrabRawSinkFrame(CS_Sink sink, struct WPI_RawFrame* image,

@@ -4,11 +4,11 @@
 
 #include "RawSourceImpl.h"
 
+#include <memory>
+
 #include <wpi/timestamp.h>
 
-#include "Handle.h"
 #include "Instance.h"
-#include "Log.h"
 #include "Notifier.h"
 #include "cscore_raw.h"
 
@@ -53,9 +53,9 @@ void PutSourceFrame(CS_Source source, const WPI_RawFrame& image,
 }  // namespace cs
 
 extern "C" {
-CS_Source CS_CreateRawSource(const char* name, CS_Bool isCv,
+CS_Source CS_CreateRawSource(const struct WPI_String* name, CS_Bool isCv,
                              const CS_VideoMode* mode, CS_Status* status) {
-  return cs::CreateRawSource(name, isCv,
+  return cs::CreateRawSource(wpi::to_string_view(name), isCv,
                              static_cast<const cs::VideoMode&>(*mode), status);
 }
 

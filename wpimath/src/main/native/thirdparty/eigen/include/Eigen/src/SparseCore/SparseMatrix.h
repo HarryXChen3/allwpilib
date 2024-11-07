@@ -250,7 +250,7 @@ class SparseMatrix : public SparseCompressedBase<SparseMatrix<Scalar_, Options_,
       }
     }
     if ((dst < end) && (m_data.index(dst) == inner)) {
-      // this coefficient exists, return a refernece to it
+      // this coefficient exists, return a reference to it
       if (inserted != nullptr) {
         *inserted = false;
       }
@@ -563,6 +563,8 @@ class SparseMatrix : public SparseCompressedBase<SparseMatrix<Scalar_, Options_,
   /** \internal
    * same as insert(Index,Index) except that the indices are given relative to the storage order */
   Scalar& insertByOuterInner(Index j, Index i) {
+    eigen_assert(j >= 0 && j < m_outerSize && "invalid outer index");
+    eigen_assert(i >= 0 && i < m_innerSize && "invalid inner index");
     Index start = m_outerIndex[j];
     Index end = isCompressed() ? m_outerIndex[j + 1] : start + m_innerNonZeros[j];
     Index dst = start == end ? end : m_data.searchLowerIndex(start, end, i);
@@ -1224,8 +1226,8 @@ void set_from_triplets_sorted(const InputIterator& begin, const InputIterator& e
   // matrix is finalized
 }
 
-// thin wrapper around a generic binary functor to use the sparse disjunction evaulator instead of the default
-// "arithmetic" evaulator
+// thin wrapper around a generic binary functor to use the sparse disjunction evaluator instead of the default
+// "arithmetic" evaluator
 template <typename DupFunctor, typename LhsScalar, typename RhsScalar = LhsScalar>
 struct scalar_disjunction_op {
   using result_type = typename result_of<DupFunctor(LhsScalar, RhsScalar)>::type;
@@ -1631,7 +1633,7 @@ SparseMatrix<Scalar_, Options_, StorageIndex_>::insertCompressedAtByOuterInner(I
   // first, check if there is adequate allocated memory
   if (m_data.allocatedSize() <= m_data.size()) {
     // if there is no capacity for a single insertion, double the capacity
-    // increase capacity by a mininum of 32
+    // increase capacity by a minimum of 32
     Index minReserve = 32;
     Index reserveSize = numext::maxi(minReserve, m_data.allocatedSize());
     m_data.reserve(reserveSize);

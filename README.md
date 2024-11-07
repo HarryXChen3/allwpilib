@@ -60,7 +60,7 @@ On macOS ARM, run `softwareupdate --install-rosetta`. This is necessary to be ab
 
 ## Setup
 
-Clone the WPILib repository and follow the instructions above for installing any required tooling.
+Clone the WPILib repository and follow the instructions above for installing any required tooling. The build process uses versioning information from git. Downloading the source is not sufficient to run the build.
 
 See the [styleguide README](https://github.com/wpilibsuite/styleguide/blob/main/README.md) for wpiformat setup instructions.
 
@@ -142,6 +142,10 @@ wpiformat can be executed anywhere in the repository via `py -3 -m wpiformat` on
 The Java code quality tools Checkstyle, PMD, and Spotless can be run via `./gradlew javaFormat`. SpotBugs can be run via the `spotbugsMain`, `spotbugsTest`, and `spotbugsDev` tasks. These tools will all be run automatically by the `build` task. To disable this behavior, pass the `-PskipJavaFormat` flag.
 
 If you only want to run the Java autoformatter, run `./gradlew spotlessApply`.
+
+### Generated files
+
+Several files within WPILib are generated using Jinja. If a PR is opened that modifies these templates then the files can be generated through CI by commenting `/pregen` on the PR. A new commit will be pushed with the regenerated files. See [GeneratedFiles.md](GeneratedFiles.md) for more information.
 
 ### CMake
 

@@ -4,9 +4,9 @@
 
 #include <cstdio>
 #include <span>
-#include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <cameraserver/CameraServer.h>
 #include <fmt/format.h>
@@ -32,6 +32,19 @@
  * solution!
  */
 class Robot : public frc::TimedRobot {
+ public:
+  Robot() {
+    // We need to run our vision program in a separate thread. If not, our robot
+    // program will not run.
+#if defined(__linux__) || defined(_WIN32)
+    std::thread visionThread(VisionThread);
+    visionThread.detach();
+#else
+    std::fputs("Vision only available on Linux or Windows.\n", stderr);
+    std::fflush(stderr);
+#endif
+  }
+
 #if defined(__linux__) || defined(_WIN32)
 
  private:
@@ -147,18 +160,6 @@ class Robot : public frc::TimedRobot {
     }
   }
 #endif
-
-  void RobotInit() override {
-    // We need to run our vision program in a separate thread. If not, our robot
-    // program will not run.
-#if defined(__linux__) || defined(_WIN32)
-    std::thread visionThread(VisionThread);
-    visionThread.detach();
-#else
-    std::fputs("Vision only available on Linux or Windows.\n", stderr);
-    std::fflush(stderr);
-#endif
-  }
 };
 
 #ifndef RUNNING_FRC_TESTS

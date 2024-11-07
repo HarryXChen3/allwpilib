@@ -10,13 +10,13 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import edu.wpi.first.math.MathSharedStore;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.proto.Rotation2dProto;
 import edu.wpi.first.math.geometry.struct.Rotation2dStruct;
 import edu.wpi.first.math.interpolation.Interpolatable;
 import edu.wpi.first.math.util.Units;
-import edu.wpi.first.units.Angle;
-import edu.wpi.first.units.Measure;
+import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.util.protobuf.ProtobufSerializable;
 import edu.wpi.first.util.struct.StructSerializable;
 import java.util.Objects;
@@ -118,6 +118,8 @@ public class Rotation2d
     } else {
       m_sin = 0.0;
       m_cos = 1.0;
+      MathSharedStore.reportError(
+          "x and y components of Rotation2d are zero\n", Thread.currentThread().getStackTrace());
     }
     m_value = Math.atan2(m_sin, m_cos);
   }
@@ -127,7 +129,7 @@ public class Rotation2d
    *
    * @param angle The angle of the rotation.
    */
-  public Rotation2d(Measure<Angle> angle) {
+  public Rotation2d(Angle angle) {
     this(angle.in(Radians));
   }
 
@@ -162,7 +164,7 @@ public class Rotation2d
   }
 
   /**
-   * Adds two rotations together, with the result being bounded between -pi and pi.
+   * Adds two rotations together, with the result being bounded between -π and π.
    *
    * <p>For example, <code>Rotation2d.fromDegrees(30).plus(Rotation2d.fromDegrees(60))</code> equals
    * <code>Rotation2d(Math.PI/2.0)</code>
@@ -241,7 +243,7 @@ public class Rotation2d
    *
    * @return The measure of the Rotation2d.
    */
-  public Measure<Angle> getMeasure() {
+  public Angle getMeasure() {
     return Radians.of(getRadians());
   }
 
@@ -249,7 +251,7 @@ public class Rotation2d
    * Returns the radian value of the Rotation2d.
    *
    * @return The radian value of the Rotation2d.
-   * @see edu.wpi.first.math.MathUtil#angleModulus(double) to constrain the angle within (-pi, pi]
+   * @see edu.wpi.first.math.MathUtil#angleModulus(double) to constrain the angle within (-π, π]
    */
   @JsonProperty
   public double getRadians() {
@@ -316,11 +318,8 @@ public class Rotation2d
    */
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof Rotation2d) {
-      var other = (Rotation2d) obj;
-      return Math.hypot(m_cos - other.m_cos, m_sin - other.m_sin) < 1E-9;
-    }
-    return false;
+    return obj instanceof Rotation2d other
+        && Math.hypot(m_cos - other.m_cos, m_sin - other.m_sin) < 1E-9;
   }
 
   @Override

@@ -8,11 +8,12 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <fields/fields.h>
-#include <fmt/format.h>
 #include <frc/geometry/Pose2d.h>
 #include <frc/geometry/Rotation2d.h>
 #include <frc/geometry/Translation2d.h>
@@ -30,6 +31,7 @@
 #include <wpi/StringMap.h>
 #include <wpi/fs.h>
 #include <wpi/json.h>
+#include <wpi/print.h>
 #include <wpigui.h>
 
 #include "glass/Context.h"
@@ -233,7 +235,7 @@ class FieldInfo {
   FieldFrameData GetFrameData(ImVec2 min, ImVec2 max) const;
   void Draw(ImDrawList* drawList, const FieldFrameData& frameData) const;
 
-  wpi::StringMap<std::unique_ptr<ObjectInfo>> m_objects;
+  wpi::StringMap<ObjectInfo> m_objects;
 
  private:
   void Reset();
@@ -450,7 +452,7 @@ bool FieldInfo::LoadJson(std::span<const char> is, std::string_view filename) {
   try {
     j = wpi::json::parse(is);
   } catch (const wpi::json::parse_error& e) {
-    fmt::print(stderr, "GUI: JSON: could not parse: {}\n", e.what());
+    wpi::print(stderr, "GUI: JSON: could not parse: {}\n", e.what());
     return false;
   }
 
@@ -465,7 +467,7 @@ bool FieldInfo::LoadJson(std::span<const char> is, std::string_view filename) {
   try {
     image = j.at("field-image").get<std::string>();
   } catch (const wpi::json::exception& e) {
-    fmt::print(stderr, "GUI: JSON: could not read field-image: {}\n", e.what());
+    wpi::print(stderr, "GUI: JSON: could not read field-image: {}\n", e.what());
     return false;
   }
 
@@ -477,7 +479,7 @@ bool FieldInfo::LoadJson(std::span<const char> is, std::string_view filename) {
     bottom = j.at("field-corners").at("bottom-right").at(1).get<int>();
     right = j.at("field-corners").at("bottom-right").at(0).get<int>();
   } catch (const wpi::json::exception& e) {
-    fmt::print(stderr, "GUI: JSON: could not read field-corners: {}\n",
+    wpi::print(stderr, "GUI: JSON: could not read field-corners: {}\n",
                e.what());
     return false;
   }
@@ -489,7 +491,7 @@ bool FieldInfo::LoadJson(std::span<const char> is, std::string_view filename) {
     width = j.at("field-size").at(0).get<float>();
     height = j.at("field-size").at(1).get<float>();
   } catch (const wpi::json::exception& e) {
-    fmt::print(stderr, "GUI: JSON: could not read field-size: {}\n", e.what());
+    wpi::print(stderr, "GUI: JSON: could not read field-size: {}\n", e.what());
     return false;
   }
 
@@ -498,7 +500,7 @@ bool FieldInfo::LoadJson(std::span<const char> is, std::string_view filename) {
   try {
     unit = j.at("field-unit").get<std::string>();
   } catch (const wpi::json::exception& e) {
-    fmt::print(stderr, "GUI: JSON: could not read field-unit: {}\n", e.what());
+    wpi::print(stderr, "GUI: JSON: could not read field-unit: {}\n", e.what());
     return false;
   }
 
@@ -512,7 +514,7 @@ bool FieldInfo::LoadJson(std::span<const char> is, std::string_view filename) {
   int fieldWidth = m_right - m_left;
   int fieldHeight = m_bottom - m_top;
   if (std::abs((fieldWidth / width) - (fieldHeight / height)) > 0.3) {
-    fmt::print(stderr,
+    wpi::print(stderr,
                "GUI: Field X and Y scaling substantially different: "
                "xscale={} yscale={}\n",
                (fieldWidth / width), (fieldHeight / height));
@@ -540,20 +542,18 @@ bool FieldInfo::LoadJson(std::span<const char> is, std::string_view filename) {
 }
 
 void FieldInfo::LoadJsonFile(std::string_view jsonfile) {
-  std::error_code ec;
-  std::unique_ptr<wpi::MemoryBuffer> fileBuffer =
-      wpi::MemoryBuffer::GetFile(jsonfile, ec);
-  if (fileBuffer == nullptr || ec) {
+  auto fileBuffer = wpi::MemoryBuffer::GetFile(jsonfile);
+  if (!fileBuffer) {
     std::fputs("GUI: could not open field JSON file\n", stderr);
     return;
   }
-  LoadJson(
-      {reinterpret_cast<const char*>(fileBuffer->begin()), fileBuffer->size()},
-      jsonfile);
+  LoadJson({reinterpret_cast<const char*>(fileBuffer.value()->begin()),
+            fileBuffer.value()->size()},
+           jsonfile);
 }
 
 bool FieldInfo::LoadImageImpl(const std::string& fn) {
-  fmt::print("GUI: loading field image '{}'\n", fn);
+  wpi::print("GUI: loading field image '{}'\n", fn);
   auto texture = gui::Texture::CreateFromFile(fn.c_str());
   if (!texture) {
     std::puts("GUI: could not read field image");
@@ -591,6 +591,12 @@ FieldFrameData FieldInfo::GetFrameData(ImVec2 min, ImVec2 max) const {
     max.x -= 20;
     min.y += 20;
     max.y -= 20;
+
+    // also pad the image so it's the same size as the box
+    ffd.imageMin.x += 20;
+    ffd.imageMax.x -= 20;
+    ffd.imageMin.y += 20;
+    ffd.imageMax.y -= 20;
   }
 
   ffd.min = min;
@@ -745,7 +751,7 @@ void ObjectInfo::LoadImage() {
 }
 
 bool ObjectInfo::LoadImageImpl(const std::string& fn) {
-  fmt::print("GUI: loading object image '{}'\n", fn);
+  wpi::print("GUI: loading object image '{}'\n", fn);
   auto texture = gui::Texture::CreateFromFile(fn.c_str());
   if (!texture) {
     std::fputs("GUI: could not read object image\n", stderr);
@@ -946,15 +952,12 @@ void glass::DisplayField2DSettings(Field2DModel* model) {
       return;
     }
     PushID(name);
-    auto& objRef = field->m_objects[name];
-    if (!objRef) {
-      objRef = std::make_unique<ObjectInfo>(GetStorage());
-    }
-    auto obj = objRef.get();
 
     wpi::SmallString<64> nameBuf{name};
     if (ImGui::CollapsingHeader(nameBuf.c_str())) {
-      obj->DisplaySettings();
+      auto& obj =
+          field->m_objects.try_emplace(name, GetStorage()).first->second;
+      obj.DisplaySettings();
     }
     PopID();
   });
@@ -1090,14 +1093,10 @@ void FieldDisplay::Display(FieldInfo* field, Field2DModel* model,
 void FieldDisplay::DisplayObject(FieldObjectModel& model,
                                  std::string_view name) {
   PushID(name);
-  auto& objRef = m_field->m_objects[name];
-  if (!objRef) {
-    objRef = std::make_unique<ObjectInfo>(GetStorage());
-  }
-  auto obj = objRef.get();
-  obj->LoadImage();
+  auto& obj = m_field->m_objects.try_emplace(name, GetStorage()).first->second;
+  obj.LoadImage();
 
-  auto displayOptions = obj->GetDisplayOptions();
+  auto displayOptions = obj.GetDisplayOptions();
 
   m_centerLine.resize(0);
   m_leftLine.resize(0);
@@ -1134,9 +1133,9 @@ void FieldDisplay::DisplayObject(FieldObjectModel& model,
   }
 
   m_drawSplit.SetCurrentChannel(m_drawList, 0);
-  obj->DrawLine(m_drawList, m_centerLine);
-  obj->DrawLine(m_drawList, m_leftLine);
-  obj->DrawLine(m_drawList, m_rightLine);
+  obj.DrawLine(m_drawList, m_centerLine);
+  obj.DrawLine(m_drawList, m_leftLine);
+  obj.DrawLine(m_drawList, m_rightLine);
   m_drawSplit.Merge(m_drawList);
 
   PopID();

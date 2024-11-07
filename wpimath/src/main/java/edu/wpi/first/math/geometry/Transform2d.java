@@ -8,8 +8,7 @@ import static edu.wpi.first.units.Units.Meters;
 
 import edu.wpi.first.math.geometry.proto.Transform2dProto;
 import edu.wpi.first.math.geometry.struct.Transform2dStruct;
-import edu.wpi.first.units.Distance;
-import edu.wpi.first.units.Measure;
+import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.util.protobuf.ProtobufSerializable;
 import edu.wpi.first.util.struct.StructSerializable;
 import java.util.Objects;
@@ -75,7 +74,7 @@ public class Transform2d implements ProtobufSerializable, StructSerializable {
    * @param y The y component of the translational component of the transform.
    * @param rotation The rotational component of the transform.
    */
-  public Transform2d(Measure<Distance> x, Measure<Distance> y, Rotation2d rotation) {
+  public Transform2d(Distance x, Distance y, Rotation2d rotation) {
     this(x.in(Meters), y.in(Meters), rotation);
   }
 
@@ -144,6 +143,24 @@ public class Transform2d implements ProtobufSerializable, StructSerializable {
   }
 
   /**
+   * Returns the X component of the transformation's translation in a measure.
+   *
+   * @return The x component of the transformation's translation in a measure.
+   */
+  public Distance getMeasureX() {
+    return m_translation.getMeasureX();
+  }
+
+  /**
+   * Returns the Y component of the transformation's translation in a measure.
+   *
+   * @return The y component of the transformation's translation in a measure.
+   */
+  public Distance getMeasureY() {
+    return m_translation.getMeasureY();
+  }
+
+  /**
    * Returns the rotational component of the transformation.
    *
    * @return Reference to the rotational component of the transform.
@@ -179,11 +196,9 @@ public class Transform2d implements ProtobufSerializable, StructSerializable {
    */
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof Transform2d) {
-      return ((Transform2d) obj).m_translation.equals(m_translation)
-          && ((Transform2d) obj).m_rotation.equals(m_rotation);
-    }
-    return false;
+    return obj instanceof Transform2d other
+        && other.m_translation.equals(m_translation)
+        && other.m_rotation.equals(m_rotation);
   }
 
   @Override

@@ -6,8 +6,7 @@
 
 #include <bitset>
 #include <string>
-#include <tuple>
-#include <vector>
+#include <string_view>
 
 #include "sysid/analysis/AnalysisType.h"
 #include "sysid/analysis/OLS.h"

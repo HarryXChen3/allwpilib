@@ -5,9 +5,11 @@
 package edu.wpi.first.wpilibj;
 
 import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.util.FileLogger;
 import edu.wpi.first.util.WPIUtilJNI;
 import edu.wpi.first.util.concurrent.Event;
 import edu.wpi.first.util.datalog.DataLog;
+import edu.wpi.first.util.datalog.DataLogBackgroundWriter;
 import edu.wpi.first.util.datalog.IntegerLogEntry;
 import edu.wpi.first.util.datalog.StringLogEntry;
 import java.io.File;
@@ -40,7 +42,7 @@ import java.util.Random;
  * <p>By default, all NetworkTables value changes are stored to the data log.
  */
 public final class DataLogManager {
-  private static DataLog m_log;
+  private static DataLogBackgroundWriter m_log;
   private static boolean m_stopped;
   private static String m_logDir;
   private static boolean m_filenameOverride;
@@ -51,6 +53,8 @@ public final class DataLogManager {
   private static boolean m_ntLoggerEnabled = true;
   private static int m_ntEntryLogger;
   private static int m_ntConnLogger;
+  private static boolean m_consoleLoggerEnabled = true;
+  private static FileLogger m_consoleLogger;
   private static StringLogEntry m_messageLog;
 
   // if less than this much free space, delete log files until there is this much free space
@@ -113,12 +117,16 @@ public final class DataLogManager {
           }
         }
       }
-      m_log = new DataLog(m_logDir, makeLogFilename(filename), period);
+      m_log = new DataLogBackgroundWriter(m_logDir, makeLogFilename(filename), period);
       m_messageLog = new StringLogEntry(m_log, "messages");
 
       // Log all NT entries and connections
       if (m_ntLoggerEnabled) {
         startNtLog();
+      }
+      // Log console output
+      if (m_consoleLoggerEnabled) {
+        startConsoleLog();
       }
     } else if (m_stopped) {
       m_log.setFilename(makeLogFilename(filename));
@@ -204,6 +212,25 @@ public final class DataLogManager {
     }
   }
 
+  /**
+   * Enable or disable logging of the console output. Defaults to enabled.
+   *
+   * @param enabled true to enable, false to disable
+   */
+  public static synchronized void logConsoleOutput(boolean enabled) {
+    boolean wasEnabled = m_consoleLoggerEnabled;
+    m_consoleLoggerEnabled = enabled;
+    if (m_log == null) {
+      start();
+      return;
+    }
+    if (enabled && !wasEnabled) {
+      startConsoleLog();
+    } else if (!enabled && wasEnabled) {
+      stopConsoleLog();
+    }
+  }
+
   private static String makeLogDir(String dir) {
     if (!dir.isEmpty()) {
       return dir;
@@ -263,6 +290,18 @@ public final class DataLogManager {
   private static void stopNtLog() {
     NetworkTableInstance.stopEntryDataLog(m_ntEntryLogger);
     NetworkTableInstance.stopConnectionDataLog(m_ntConnLogger);
+  }
+
+  private static void startConsoleLog() {
+    if (RobotBase.isReal()) {
+      m_consoleLogger = new FileLogger("/home/lvuser/FRC_UserProgram.log", m_log, "console");
+    }
+  }
+
+  private static void stopConsoleLog() {
+    if (RobotBase.isReal()) {
+      m_consoleLogger.close();
+    }
   }
 
   private static void logMain() {
@@ -381,21 +420,13 @@ public final class DataLogManager {
           DriverStation.MatchType matchType = DriverStation.getMatchType();
           if (matchType != DriverStation.MatchType.None) {
             // rename per match info
-            char matchTypeChar;
-            switch (matchType) {
-              case Practice:
-                matchTypeChar = 'P';
-                break;
-              case Qualification:
-                matchTypeChar = 'Q';
-                break;
-              case Elimination:
-                matchTypeChar = 'E';
-                break;
-              default:
-                matchTypeChar = '_';
-                break;
-            }
+            char matchTypeChar =
+                switch (matchType) {
+                  case Practice -> 'P';
+                  case Qualification -> 'Q';
+                  case Elimination -> 'E';
+                  default -> '_';
+                };
             m_log.setFilename(
                 "FRC_"
                     + m_timeFormatter.format(LocalDateTime.now(m_utc))

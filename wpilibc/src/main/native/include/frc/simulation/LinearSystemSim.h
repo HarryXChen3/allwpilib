@@ -10,7 +10,6 @@
 #include <units/time.h>
 
 #include "frc/EigenCore.h"
-#include "frc/RobotController.h"
 #include "frc/StateSpaceUtil.h"
 #include "frc/system/LinearSystem.h"
 
@@ -86,7 +85,7 @@ class LinearSystemSim {
    *
    * @param u The system inputs.
    */
-  void SetInput(const Vectord<Inputs>& u) { m_u = ClampInput(u); }
+  void SetInput(const Vectord<Inputs>& u) { m_u = u; }
 
   /**
    * Sets the system inputs.
@@ -94,10 +93,7 @@ class LinearSystemSim {
    * @param row   The row in the input matrix to set.
    * @param value The value to set the row to.
    */
-  void SetInput(int row, double value) {
-    m_u(row, 0) = value;
-    ClampInput(m_u);
-  }
+  void SetInput(int row, double value) { m_u(row, 0) = value; }
 
   /**
    * Returns the current input of the plant.
@@ -121,14 +117,6 @@ class LinearSystemSim {
    */
   void SetState(const Vectord<States>& state) { m_x = state; }
 
-  /**
-   * Returns the current drawn by this simulated system. Override this method to
-   * add a custom current calculation.
-   *
-   * @return The current drawn by this simulated mechanism.
-   */
-  virtual units::ampere_t GetCurrentDraw() const { return 0_A; }
-
  protected:
   /**
    * Updates the state estimate of the system.
@@ -147,12 +135,10 @@ class LinearSystemSim {
    * Clamp the input vector such that no element exceeds the given voltage. If
    * any does, the relative magnitudes of the input will be maintained.
    *
-   * @param u          The input vector.
-   * @return The normalized input.
+   * @param maxInput The maximum magnitude of the input vector after clamping.
    */
-  Vectord<Inputs> ClampInput(Vectord<Inputs> u) {
-    return frc::DesaturateInputVector<Inputs>(
-        u, frc::RobotController::GetInputVoltage());
+  void ClampInput(double maxInput) {
+    m_u = frc::DesaturateInputVector<Inputs>(m_u, maxInput);
   }
 
   /// The plant that represents the linear system.

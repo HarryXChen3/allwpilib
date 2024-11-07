@@ -4,9 +4,16 @@
 
 #pragma once
 
+#include <frc/geometry/Rotation2d.h>
+
 #include <hal/SimDevice.h>
 
 namespace frc {
+
+/**
+ * @ingroup xrp_api
+ * @{
+ */
 
 /**
  * Use a rate gyro to return the robots heading relative to a starting position.
@@ -16,6 +23,11 @@ namespace frc {
  */
 class XRPGyro {
  public:
+  /**
+   * Constructs an XRPGyro.
+   *
+   * <p>Only one instance of a XRPGyro is supported.
+   */
   XRPGyro();
 
   /**
@@ -31,6 +43,13 @@ class XRPGyro {
   double GetAngle() const;
 
   /**
+   * Gets the angle the robot is facing.
+   *
+   * @return A Rotation2d with the current heading.
+   */
+  frc::Rotation2d GetRotation2d() const;
+
+  /**
    * Return the rate of rotation of the gyro
    *
    * The rate is based on the most recent reading of the gyro.
@@ -40,37 +59,49 @@ class XRPGyro {
   double GetRate() const;
 
   /**
-   * Gets the rate of turn in degrees-per-second around the X-axis
+   * Gets the rate of turn in degrees-per-second around the X-axis.
+   *
+   * @return rate of turn in degrees-per-second
    */
   double GetRateX() const;
 
   /**
-   * Gets the rate of turn in degrees-per-second around the Y-axis
+   * Gets the rate of turn in degrees-per-second around the Y-axis.
+   *
+   * @return rate of turn in degrees-per-second
    */
   double GetRateY() const;
 
   /**
-   * Gets the rate of turn in degrees-per-second around the Z-axis
+   * Gets the rate of turn in degrees-per-second around the Z-axis.
+   *
+   * @return rate of turn in degrees-per-second
    */
   double GetRateZ() const;
 
   /**
-   * Gets the currently reported angle around the X-axis
+   * Gets the currently reported angle around the X-axis.
+   *
+   * @return current angle around X-axis in degrees
    */
   double GetAngleX() const;
 
   /**
-   * Gets the currently reported angle around the X-axis
+   * Gets the currently reported angle around the Y-axis.
+   *
+   * @return current angle around Y-axis in degrees
    */
   double GetAngleY() const;
 
   /**
-   * Gets the currently reported angle around the X-axis
+   * Gets the currently reported angle around the Z-axis.
+   *
+   * @return current angle around Z-axis in degrees
    */
   double GetAngleZ() const;
 
   /**
-   * Resets the gyro
+   * Reset the gyro angles to 0.
    */
   void Reset();
 
@@ -87,5 +118,7 @@ class XRPGyro {
   double m_angleYOffset = 0;
   double m_angleZOffset = 0;
 };
+
+/** @} */
 
 }  // namespace frc

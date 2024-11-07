@@ -91,43 +91,28 @@ public abstract class RobotBase implements AutoCloseable {
           @Override
           public void reportUsage(MathUsageId id, int count) {
             switch (id) {
-              case kKinematics_DifferentialDrive:
-                HAL.report(
-                    tResourceType.kResourceType_Kinematics,
-                    tInstances.kKinematics_DifferentialDrive);
-                break;
-              case kKinematics_MecanumDrive:
-                HAL.report(
-                    tResourceType.kResourceType_Kinematics, tInstances.kKinematics_MecanumDrive);
-                break;
-              case kKinematics_SwerveDrive:
-                HAL.report(
-                    tResourceType.kResourceType_Kinematics, tInstances.kKinematics_SwerveDrive);
-                break;
-              case kTrajectory_TrapezoidProfile:
-                HAL.report(tResourceType.kResourceType_TrapezoidProfile, count);
-                break;
-              case kFilter_Linear:
-                HAL.report(tResourceType.kResourceType_LinearFilter, count);
-                break;
-              case kOdometry_DifferentialDrive:
-                HAL.report(
-                    tResourceType.kResourceType_Odometry, tInstances.kOdometry_DifferentialDrive);
-                break;
-              case kOdometry_SwerveDrive:
-                HAL.report(tResourceType.kResourceType_Odometry, tInstances.kOdometry_SwerveDrive);
-                break;
-              case kOdometry_MecanumDrive:
-                HAL.report(tResourceType.kResourceType_Odometry, tInstances.kOdometry_MecanumDrive);
-                break;
-              case kController_PIDController2:
-                HAL.report(tResourceType.kResourceType_PIDController2, count);
-                break;
-              case kController_ProfiledPIDController:
-                HAL.report(tResourceType.kResourceType_ProfiledPIDController, count);
-                break;
-              default:
-                break;
+              case kKinematics_DifferentialDrive -> HAL.report(
+                  tResourceType.kResourceType_Kinematics, tInstances.kKinematics_DifferentialDrive);
+              case kKinematics_MecanumDrive -> HAL.report(
+                  tResourceType.kResourceType_Kinematics, tInstances.kKinematics_MecanumDrive);
+              case kKinematics_SwerveDrive -> HAL.report(
+                  tResourceType.kResourceType_Kinematics, tInstances.kKinematics_SwerveDrive);
+              case kTrajectory_TrapezoidProfile -> HAL.report(
+                  tResourceType.kResourceType_TrapezoidProfile, count);
+              case kFilter_Linear -> HAL.report(tResourceType.kResourceType_LinearFilter, count);
+              case kOdometry_DifferentialDrive -> HAL.report(
+                  tResourceType.kResourceType_Odometry, tInstances.kOdometry_DifferentialDrive);
+              case kOdometry_SwerveDrive -> HAL.report(
+                  tResourceType.kResourceType_Odometry, tInstances.kOdometry_SwerveDrive);
+              case kOdometry_MecanumDrive -> HAL.report(
+                  tResourceType.kResourceType_Odometry, tInstances.kOdometry_MecanumDrive);
+              case kController_PIDController2 -> HAL.report(
+                  tResourceType.kResourceType_PIDController2, count);
+              case kController_ProfiledPIDController -> HAL.report(
+                  tResourceType.kResourceType_ProfiledPIDController, count);
+              default -> {
+                // NOP
+              }
             }
           }
 
@@ -412,6 +397,9 @@ public abstract class RobotBase implements AutoCloseable {
    * @param robotSupplier Function that returns an instance of the robot subclass.
    */
   public static <T extends RobotBase> void startRobot(Supplier<T> robotSupplier) {
+    // Check that the MSVC runtime is valid.
+    WPIUtilJNI.checkMsvcRuntime();
+
     if (!HAL.initialize(500, 0)) {
       throw new IllegalStateException("Failed to initialize. Terminating");
     }
