@@ -60,12 +60,12 @@ inline void ReportError(int32_t status, const char* fileName, int lineNumber,
 }
 }  // namespace frc
 
-#define FRC_ReportError(status, format, ...)                             \
-  do {                                                                   \
-    if ((status) != 0) {                                                 \
-      ::frc::ReportError(status, __FILE__, __LINE__, __FUNCTION__,       \
-                         FMT_STRING(format) __VA_OPT__(, ) __VA_ARGS__); \
-    }                                                                    \
+#define FRC_ReportError(status, format, ...)                       \
+  do {                                                             \
+    if ((status) != 0) {                                           \
+      ::frc::ReportError(status, __FILE__, __LINE__, __FUNCTION__, \
+                         format __VA_OPT__(, ) __VA_ARGS__);       \
+    }                                                              \
   } while (0)
 
 namespace RobotController {
@@ -551,24 +551,28 @@ void DataLogManager::SignalNewDSDataOccur() {
 
 extern "C" {
 
-void DLM_Start(const char* dir, const char* filename, double period) {
-  DataLogManager::Start(dir, filename, period);
+void DLM_Start(const struct WPI_String* dir, const struct WPI_String* filename,
+               double period) {
+  DataLogManager::Start(wpi::to_string_view(dir), wpi::to_string_view(filename),
+                        period);
 }
 
 void DLM_Stop(void) {
   DataLogManager::Stop();
 }
 
-void DLM_Log(const char* message) {
-  DataLogManager::Log(message);
+void DLM_Log(const struct WPI_String* message) {
+  DataLogManager::Log(wpi::to_string_view(message));
 }
 
 WPI_DataLog* DLM_GetLog(void) {
   return reinterpret_cast<WPI_DataLog*>(&DataLogManager::GetLog());
 }
 
-const char* DLM_GetLogDir(void) {
-  return DataLogManager::GetLogDir().data();
+void DLM_GetLogDir(struct WPI_String* value) {
+  auto logDir = DataLogManager::GetLogDir();
+  char* write = WPI_AllocateString(value, logDir.size());
+  std::memcpy(write, logDir.data(), logDir.size());
 }
 
 void DLM_LogNetworkTables(int enabled) {

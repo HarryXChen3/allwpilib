@@ -56,15 +56,25 @@ class WPILIB_DLLEXPORT Translation3d {
   }
 
   /**
-   * Constructs a Translation3d from the provided translation vector's X, Y, and
-   * Z components. The values are assumed to be in meters.
+   * Constructs a Translation3d from a 3D translation vector. The values are
+   * assumed to be in meters.
    *
-   * @param vector The translation vector to represent.
+   * @param vector The translation vector.
    */
   constexpr explicit Translation3d(const Eigen::Vector3d& vector)
       : m_x{units::meter_t{vector.x()}},
         m_y{units::meter_t{vector.y()}},
         m_z{units::meter_t{vector.z()}} {}
+
+  /**
+   * Constructs a 3D translation from a 2D translation in the X-Y plane.
+   *
+   * @param translation The 2D translation.
+   * @see Pose3d(Pose2d)
+   * @see Transform3d(Transform2d)
+   */
+  constexpr explicit Translation3d(const Translation2d& translation)
+      : Translation3d{translation.X(), translation.Y(), 0_m} {}
 
   /**
    * Calculates the distance between two translations in 3D space.
@@ -104,9 +114,9 @@ class WPILIB_DLLEXPORT Translation3d {
   constexpr units::meter_t Z() const { return m_z; }
 
   /**
-   * Returns a vector representation of this translation.
+   * Returns a 3D translation vector representation of this translation.
    *
-   * @return A Vector representation of this translation.
+   * @return A 3D translation vector representation of this translation.
    */
   constexpr Eigen::Vector3d ToVector() const {
     return Eigen::Vector3d{{m_x.value(), m_y.value(), m_z.value()}};
@@ -236,7 +246,5 @@ void from_json(const wpi::json& json, Translation3d& state);
 
 }  // namespace frc
 
-#ifndef NO_PROTOBUF
 #include "frc/geometry/proto/Translation3dProto.h"
-#endif
 #include "frc/geometry/struct/Translation3dStruct.h"

@@ -17,6 +17,7 @@ Welcome to the WPILib project. This repository contains the HAL, WPILibJ, and WP
     - [Custom toolchain location](#custom-toolchain-location)
     - [Formatting/Linting](#formattinglinting)
     - [CMake](#cmake)
+    - [Bazel](#bazel)
   - [Running examples in simulation](#running-examples-in-simulation)
   - [Publishing](#publishing)
   - [Structure and Organization](#structure-and-organization)
@@ -57,6 +58,8 @@ Using Gradle makes building WPILib very straightforward. It only has a few depen
     - Run `./gradlew installArm32Toolchain` after cloning this repository
 
 On macOS ARM, run `softwareupdate --install-rosetta`. This is necessary to be able to use the macOS x86 roboRIO toolchain on ARM.
+
+On linux, run `sudo apt install gfortran`. This is necessary to be able to build WPIcal on linux platforms.
 
 ## Setup
 
@@ -149,7 +152,11 @@ Several files within WPILib are generated using Jinja. If a PR is opened that mo
 
 ### CMake
 
-CMake is also supported for building. See [README-CMAKE.md](README-CMAKE.md).
+CMake is also supported for building. See [README-CMake.md](README-CMake.md).
+
+### Bazel
+
+Bazel is also supported for building. See [README-Bazel.md](README-Bazel.md).
 
 ## Running examples in simulation
 
