@@ -19,6 +19,7 @@
 #include <wpi/json.h>
 
 #include "sysid/analysis/AnalysisType.h"
+#include "sysid/analysis/FeedforwardAnalysis.h"
 #include "sysid/analysis/FeedbackAnalysis.h"
 #include "sysid/analysis/FeedbackControllerPreset.h"
 #include "sysid/analysis/OLS.h"

@@ -165,10 +165,10 @@ static constexpr double PercentErrorDecimal(const double actual, const double ex
  * @param gainIndex The corresponding index of the gain in typical order, {Ks, Kv, Ka, [Kg], [offset]} where [] denotes optional (conditional)
 */
 static bool IsOutOfRangeFeedforwardGain(const sysid::FeedforwardGain& ffGain, const size_t gainIndex) {
-  return gainIndex == 0 && ffGain.gain < 0  // Ks
-    || gainIndex == 1 && ffGain.gain < 0    // Kv
-    || gainIndex == 2 && ffGain.gain <= 0   // Ka
-    || gainIndex == 3 && ffGain.gain < 0;   // Kg
+  return (gainIndex == 0 && ffGain.gain < 0)  // Ks
+    || (gainIndex == 1 && ffGain.gain < 0 )   // Kv
+    || (gainIndex == 2 && ffGain.gain <= 0)   // Ka
+    || (gainIndex == 3 && ffGain.gain < 0);   // Kg
 }
 
 /**

@@ -10,6 +10,7 @@
 #include <cmath>
 #include <string>
 #include <vector>
+#include <numeric>
 
 #include <Eigen/Eigenvalues>
 #include <fmt/format.h>
